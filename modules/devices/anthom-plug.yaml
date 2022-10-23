@@ -1,0 +1,78 @@
+---
+substitutions:
+  board: esp8285
+  power_measure_interval: 3s
+
+packages:
+  common: !include ../common-esp8266.yaml
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: 5
+      mode: INPUT_PULLUP
+      inverted: true
+    name: ${friendly_name} Power Button
+    disabled_by_default: true
+    on_multi_click:
+      - timing:
+          - ON for at most 1s
+          - OFF for at least 0.2s
+        then:
+          - switch.toggle: relay
+      - timing:
+          - ON for at least 4s
+        then:
+          - button.press: Reset
+
+uart:
+  rx_pin: RX
+  baud_rate: 4800
+
+sensor:
+  - platform: cse7766
+    update_interval: ${power_measure_interval}
+      name: ${friendly_name} Current
+      filters:
+          - lambda: if (x < 0.060) return 0.0; else return x;   #For the chip will report less than 3w power when no load is connected
+
+    voltage:
+      name: ${friendly_name} Voltage
+    power:
+      name: ${friendly_name} Power
+      id: power_sensor
+      filters:
+          - lambda: if (x < 3.0) return 0.0; else return x;    #For the chip will report less than 3w power when no load is connected
+
+    energy:
+      name: ${friendly_name} Energy
+      unit_of_measurement: kWh
+      filters:
+        # Multiplication factor from W to kW is 0.001
+        - multiply: 0.001
+
+  - platform: total_daily_energy
+    name: ${friendly_name} Total Daily Energy
+    restore: true
+    power_id: power_sensor
+    unit_of_measurement: kWh
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.001
+
+button:
+  - platform: factory_reset
+    name: Restart with Factory Default Settings
+    id: Reset
+
+switch:
+  - platform: gpio
+    name: ${friendly_name}
+    pin: GPIO12
+    id: relay
+    restore_mode: RESTORE_DEFAULT_OFF
+
+status_led:
+  pin:
+    number: GPIO13
+    inverted: true

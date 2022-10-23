@@ -1,0 +1,7 @@
+---
+substitutions:
+  device_name: router-table-power-plug
+  friendly_name: Router Table Power Plug
+
+packages:
+  common: !include ../modules/devices/anthom-plug.yaml

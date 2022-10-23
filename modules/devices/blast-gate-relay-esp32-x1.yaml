@@ -1,0 +1,13 @@
+---
+packages:
+  common: !include ../common-esp32.yaml
+
+status_led:
+  pin: GPIO23
+
+switch:
+  - platform: gpio
+    pin: GPIO16
+    id: blast_gate1
+    name: blast gate
+    restore_mode: RESTORE_DEFAULT_OFF
