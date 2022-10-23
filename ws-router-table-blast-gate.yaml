@@ -1,7 +1,9 @@
+# Configuration for the esp32 relay board connected to the router tables blast
+# gate.
 ---
 substitutions:
   device_name: router-table-blast-gate
   friendly_name: Router Table Blast Gate
 
 packages:
-  common: !include ../modules/devices/blast-gate-relay-esp32-x1.yaml
+  common: !include ./modules/devices/blast-gate-relay-esp32-x1.yaml

@@ -1,7 +1,11 @@
+# Common configuration for Anthom power plugs found here:
+# https://www.athom.tech/blank-1/esphome-au-plug
 ---
 substitutions:
   board: esp8285
-  power_measure_interval: 3s
+  # Interval for which the cse7766 sensor should be polled for new data. Note
+  # very low values here will put the device under considerably more load.
+  power_measure_interval: 3s 
 
 packages:
   common: !include ../common-esp8266.yaml
@@ -12,7 +16,7 @@ binary_sensor:
       number: 5
       mode: INPUT_PULLUP
       inverted: true
-    name: ${friendly_name} Power Button
+    name: "${friendly_name} Power Button"
     disabled_by_default: true
     on_multi_click:
       - timing:
@@ -32,6 +36,7 @@ uart:
 sensor:
   - platform: cse7766
     update_interval: ${power_measure_interval}
+    current:
       name: ${friendly_name} Current
       filters:
           - lambda: if (x < 0.060) return 0.0; else return x;   #For the chip will report less than 3w power when no load is connected

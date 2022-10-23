@@ -1,7 +1,8 @@
+# Configuration for the Anthom power plug connected to the router table.
 ---
 substitutions:
   device_name: router-table-power-plug
   friendly_name: Router Table Power Plug
 
 packages:
-  common: !include ../modules/devices/anthom-plug.yaml
+  common: !include ./modules/devices/anthom-plug.yaml

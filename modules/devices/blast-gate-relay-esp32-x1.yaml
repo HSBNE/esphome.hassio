@@ -1,3 +1,5 @@
+# Common configuration for esp32 single relay board from AliExpress here.
+# https://www.aliexpress.com/item/1005003771018610.html?spm=a2g0o.order_list.0.0.6d461802OGTvAx
 ---
 packages:
   common: !include ../common-esp32.yaml
@@ -6,8 +8,9 @@ status_led:
   pin: GPIO23
 
 switch:
+  # Relay 1
   - platform: gpio
     pin: GPIO16
-    id: blast_gate1
-    name: blast gate
+    id: relay1
+    name: Relay 1
     restore_mode: RESTORE_DEFAULT_OFF
