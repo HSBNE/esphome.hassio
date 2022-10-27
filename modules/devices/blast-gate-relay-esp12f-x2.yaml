@@ -1,0 +1,19 @@
+---
+substitutions:
+  board: esp12e
+  upload_speed: "115200"
+
+packages:
+  common: !include ../common-esp8266.yaml
+
+switch:
+  - platform: gpio
+    pin: GPIO4
+    id: relay1
+    name: ${friendly_name} 1
+    restore_mode: RESTORE_DEFAULT_OFF
+  - platform: gpio
+    pin: GPIO5
+    id: relay2
+    name: ${friendly_name} 2
+    restore_mode: RESTORE_DEFAULT_OFF

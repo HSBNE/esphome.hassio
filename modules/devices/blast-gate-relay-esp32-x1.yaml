@@ -1,6 +1,9 @@
 # Common configuration for esp32 single relay board from AliExpress here.
 # https://www.aliexpress.com/item/1005003771018610.html?spm=a2g0o.order_list.0.0.6d461802OGTvAx
 ---
+substitutions:
+  upload_speed: "115200"
+
 packages:
   common: !include ../common-esp32.yaml
 
@@ -12,5 +15,5 @@ switch:
   - platform: gpio
     pin: GPIO16
     id: relay1
-    name: Relay 1
+    name: ${friendly_name}
     restore_mode: RESTORE_DEFAULT_OFF

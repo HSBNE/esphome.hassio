@@ -7,6 +7,7 @@ esphome:
     version: 1.0.0
 
 packages:
+  esphome: !include common/esphome.yaml
   wifi: !include common/wifi.yaml
   ota: !include common/ota.yaml
   sensors: !include common/sensors.yaml

@@ -1,0 +1,55 @@
+blueprint:
+  name: Woodshop Blast Gate Control On Power
+  description: Turn on Woodshop tool blast gates based on power usage over an instantaneous energy value and off under the same energy value..
+  domain: automation
+  input:
+    trigger_watts:
+      name: Trigger wattage
+      description: The instantaneous power value that triggers this automation.
+      default: 10
+      selector:
+        number:
+          min: 5
+          unit_of_measurement: w
+          mode: box
+    power_plug:
+      name: Power Plug(s)
+      description: The power plug(s) to monitor for consumption
+      selector:
+        entity:
+          multiple: false
+          domain: sensor
+          device_class: power
+    blast_gate:
+      name: Blast Gate(s)
+      description: The blast gates to turn on and off
+      selector:
+        target:
+          entity:
+            domain: switch
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input power_plug
+    above: !input trigger_watts
+    id: turn_on
+  - platform: numeric_state
+    entity_id: !input power_plug
+    below: !input trigger_watts
+    id: turn_off
+action: []
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: turn_on
+        sequence:
+          - service: switch.turn_on
+            target: !input blast_gate
+      - conditions:
+          - condition: trigger
+            id: turn_off
+        sequence:
+          - service: switch.turn_off
+            target: !input blast_gate
+mode: single
+

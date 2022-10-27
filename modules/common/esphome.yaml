@@ -1,0 +1,7 @@
+---
+substitutions:
+  upload_speed: "115200"
+
+esphome:
+  platformio_options:
+    upload_speed: ${upload_speed}
