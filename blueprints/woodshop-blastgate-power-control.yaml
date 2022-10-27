@@ -37,19 +37,19 @@ trigger:
     entity_id: !input power_plug
     below: !input trigger_watts
     id: turn_off
-action: []
+action:
   - choose:
-      - conditions:
-          - condition: trigger
-            id: turn_on
-        sequence:
-          - service: switch.turn_on
-            target: !input blast_gate
-      - conditions:
-          - condition: trigger
-            id: turn_off
-        sequence:
-          - service: switch.turn_off
-            target: !input blast_gate
+    - conditions:
+      - condition: trigger
+        id: turn_on
+      sequence:
+        - service: switch.turn_on
+          target: !input blast_gate
+    - conditions:
+      - condition: trigger
+        id: turn_off
+      sequence:
+        - service: switch.turn_off
+          target: !input blast_gate
 mode: single
 
