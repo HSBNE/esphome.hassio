@@ -1,10 +1,14 @@
 ---
+substitutions:
+  project_name: hsbne
+  project_version: 1.0.0
+
 esphome:
   name: ${device_name}
   name_add_mac_suffix: false
   project:
-    name: hsbne.blast-gates
-    version: 1.0.0
+    name: ${project_name}
+    version: ${project_version}
 
 packages:
   esphome: !include common/esphome.yaml

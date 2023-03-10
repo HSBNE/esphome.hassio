@@ -1,0 +1,119 @@
+---
+substitutions:
+  bin_full_output: bin_full_output
+  cleaning_output: cleaning_output
+  dust_extractor_state_entity_id: sensor.dust_extractor_state
+  extraction_output: extraction_output
+  standby_output: standby_output
+
+packages:
+  states: !include extractor-states.yaml
+
+script:
+  - id: all_lights_off
+    mode: single
+    then:
+      - script.stop: light_blink
+      - light.turn_off: bin_full_light
+      - light.turn_off: cleaning_light
+      - light.turn_off: extraction_light
+      - light.turn_off: standby_light
+
+  - id: light_blink
+    mode: single
+    parameters:
+      the_light: 'light::LightState*'
+      blink_duration: int
+    then:
+      - while:
+          condition:
+            lambda: 'return true;'
+          then:
+            - lambda: the_light->toggle().perform();
+            - delay: !lambda 'return blink_duration;'
+
+  - id: light_blink_fast
+    mode: single
+    parameters:
+      the_light: 'light::LightState*'
+    then:
+      - lambda: id(light_blink)->execute(the_light, 500);
+
+  - id: light_blink_slow
+    mode: single
+    parameters:
+      the_light: 'light::LightState*'
+    then:
+      - lambda: id(light_blink)->execute(the_light, 800);
+
+  - id: light_on
+    mode: single
+    parameters:
+      the_light: 'light::LightState*'
+    then:
+      - lambda: the_light->turn_on().perform();
+
+text_sensor:
+  - platform: homeassistant
+    id: dust_extractor_state
+    entity_id: ${dust_extractor_state_entity_id}
+    internal: true
+    on_value:
+      then:
+        - script.execute: all_lights_off
+        - if:
+            condition:
+              lambda: 'return x == standby_state->value();'
+            then:
+              - lambda: id(light_on)->execute(id(standby_light));
+        - if:
+            condition:
+              lambda: 'return x == extracting_state->value();'
+            then:
+              - lambda: id(light_on)->execute(id(extraction_light));
+        - if:
+            condition:
+              lambda: 'return x == extracting_min_run_state->value();'
+            then:
+              - lambda: id(light_blink_fast)->execute(id(extraction_light));
+        - if:
+            condition:
+              lambda: 'return x == extracting_spindown_state->value();'
+            then:
+              - lambda: id(light_blink_slow)->execute(id(extraction_light));
+        - if:
+            condition:
+              lambda: 'return x == cleaning_state->value();'
+            then:
+              - lambda: id(light_on)->execute(id(cleaning_light));
+        - if:
+            condition:
+              lambda: 'return x == cleaning_spindown_state->value();'
+            then:
+              - lambda: id(light_blink_slow)->execute(id(cleaning_light));
+        - if:
+            condition:
+              lambda: 'return x == bin_full_state->value();'
+            then:
+              - lambda: id(light_on)->execute(id(bin_full_light));
+
+light:
+  - platform: binary
+    id: standby_light
+    internal: true
+    output: ${standby_output}
+
+  - platform: binary
+    id: extraction_light
+    internal: true
+    output: ${extraction_output}
+
+  - platform: binary
+    id: cleaning_light
+    internal: true
+    output: ${cleaning_output}
+
+  - platform: binary
+    id: bin_full_light
+    internal: true
+    output: ${bin_full_output}

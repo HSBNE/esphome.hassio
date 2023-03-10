@@ -1,0 +1,14 @@
+---
+substitutions:
+  cleaner_on_gpio: ""
+
+binary_sensor:
+  # Cleaner On Physical Switch
+  - platform: gpio
+    id: cleaner_on_switch
+    name: ${friendly_name} Cleaner
+    pin:
+      number: ${cleaner_on_gpio}
+      mode:
+        input: true
+        pulldown: true

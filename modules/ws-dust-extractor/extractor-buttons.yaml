@@ -1,0 +1,25 @@
+---
+substitutions:
+  extraction_on_gpio: ""
+  extraction_off_gpio: ""
+
+binary_sensor:
+  # Motor On Physical Switch
+  - platform: gpio
+    id: extraction_on_switch
+    name: ${friendly_name} On
+    pin:
+      number: ${extraction_on_gpio}
+      mode:
+        input: true
+        pulldown: true
+
+  # Motors Off Physical Switch
+  - platform: gpio
+    id: extraction_off_switch
+    name: ${friendly_name} Off
+    pin:
+      number: ${extraction_off_gpio}
+      mode:
+        input: true
+        pulldown: true

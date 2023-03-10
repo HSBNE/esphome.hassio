@@ -1,0 +1,47 @@
+# List of globals defining the states of the dust extractor. Just a way to
+# hardcode them as enums so once place can update all the usages of the states.
+#
+# List of states:
+# - standby - Machine is in standby and ready to do stuff.
+# - extracting - Machine is in extraction mode.
+# - extracting-min-run - Machine is extracting but is still in it's minimum run time.
+# - extracting-spindown - Extraction is turned off but the motor is spinning down.
+# - cleaning - The cleaning motor is running.
+# - cleaning-spindown - The cleaning motor is off but the motor is spinning down.
+# - bin-full - The dust bin is full. The extractor will do nothing until this is cleared.
+---
+globals:
+  - id: standby_state
+    type: std::string
+    restore_value: no
+    initial_value: '"standby"'
+
+  - id: extracting_state
+    type: std::string
+    restore_value: no
+    initial_value: '"extracting"'
+
+  - id: extracting_min_run_state
+    type: std::string
+    restore_value: no
+    initial_value: '"extracting-min-run"'
+
+  - id: extracting_spindown_state
+    type: std::string
+    restore_value: no
+    initial_value: '"extracting-spindown"'
+
+  - id: cleaning_state
+    type: std::string
+    restore_value: no
+    initial_value: '"cleaning"'
+
+  - id: cleaning_spindown_state
+    type: std::string
+    restore_value: no
+    initial_value: '"cleaning-spindown"'
+
+  - id: bin_full_state
+    type: std::string
+    restore_value: no
+    initial_value: '"bin-full"'

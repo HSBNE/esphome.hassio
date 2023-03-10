@@ -1,0 +1,551 @@
+# Configuration for the HSBNE dust extractor powered off of a shelly pro 2pm
+---
+substitutions:
+  clean_name: Clean
+  cleaner_name: Cleaner
+  extraction_name: Extraction
+
+packages:
+  common: !include ../common-esp32.yaml
+  states: !include ../ws-dust-extractor/extractor-states.yaml
+
+globals:
+  # The virtual state of the clean switch to be reported to clients.
+  - id: clean_virtual_state
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  # Reports the number of seconds left that the cleaner motor needs to run for
+  # as part of it's cleaning cycle
+  - id: cleaning_count_down
+    type: int
+    restore_value: no
+    initial_value: "0"
+
+  # The amount of time to run the cleaning motor for to perform a clean cycle.
+  - id: cleaning_cycle_runtime
+    type: int
+    restore_value: no
+    initial_value: "15" # 15 seconds
+
+  # Reports the number of seconds left that the cleaner motor needs to spin down
+  # for.
+  - id: cleaning_motor_spindown_count_down
+    type: int
+    restore_value: no
+    initial_value: "0"
+
+  # The amount of time the cleaning motor needs to spin down for before
+  # extraction. Can be turned on.
+  - id: cleaning_motor_spindown_time
+    type: int
+    restore_value: no
+    initial_value: "3" # 3 seconds
+
+  # The virtual state of the extraction switch to be reported to clients.
+  - id: extraction_virtual_state
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  # Acts as a lock out variable for various cleaning entrants to gate on
+  - id: is_extracting
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  # Acts as a lock out variable for various extraction entrants to gate on
+  - id: is_cleaning
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  # Reports the numbers of seconds left that the main motor needs to run for
+  # before it can be turned off.
+  - id: main_motor_count_down
+    type: int
+    restore_value: no
+    initial_value: "0"
+
+  # The maximum amount of time that the main motor can run for before it's
+  # shutdown.
+  - id: main_motor_max_runtime
+    type: int
+    restore_value: no
+    initial_value: "1800" # 30 minutes
+
+  # The minimum amount of time the main motor needs to at least run for when
+  # turned on. We don't want the main motor to be pulsed on and off for short
+  # periods of time causing damage.
+  - id: main_motor_min_runtime
+    type: int
+    restore_value: no
+    initial_value: "300" # 5 minutes
+
+  # Reports the number of seconds left that the main motor needs to run for
+  # as part of it's spin down process.
+  - id: main_motor_spindown_count_down
+    type: int
+    restore_value: no
+    initial_value: "0"
+
+  # The minimum amount of time the main motor needs to spin down and stop
+  # creating vacuum. This is important because we want to make sure there is 
+  # no vacuum before starting the cleaner
+  - id: main_motor_spindown_time
+    type: int
+    restore_value: no
+    initial_value: "15" # 15 seconds
+
+  - id: want_to_state
+    type: std::string
+    restore_value: no
+    initial_value: ""
+
+esphome:
+  on_boot:
+    priority: -100.0
+    then:
+      # Set the initial state of the dust extractor to standby. This is the
+      # entry point for the state machine.
+      - script.execute:
+          id: set_state
+          new_state: !lambda 'return standby_state->value();'
+      - script.wait: set_state
+
+script:
+  # Script is here to provide signal that the motor has at least run for the
+  # minimum amount of time that we expect.
+  - id: main_motor_min_runtime_runner
+    mode: single
+    then:
+      - globals.set:
+          id: main_motor_count_down
+          value: !lambda 'return id(main_motor_min_runtime);'
+      - while:
+          condition:
+            lambda: |-
+              return id(main_motor_count_down) > 0;
+          then:
+            - lambda: |-
+                id(main_motor_count_down) -= 1;
+            - sensor.template.publish:
+                id: extraction_min_runtime_left
+                state: !lambda 'return id(main_motor_count_down);'
+            - delay: 1s
+
+  # Script provides the state and functionality to make sure the main motor has
+  # spun down fully
+  - id: main_motor_spindown
+    mode: single
+    then:
+      - switch.turn_off: out1
+      - logger.log: Setting state to extraction-spindown
+      - script.execute:
+          id: set_state
+          new_state: !lambda 'return extracting_spindown_state->value();'
+      - globals.set:
+          id: main_motor_spindown_count_down
+          value: !lambda 'return id(main_motor_spindown_time);'
+      - while:
+          condition:
+            lambda: |-
+              return id(main_motor_spindown_count_down) > 0;
+          then:
+            - lambda: id(main_motor_spindown_count_down) -= 1;
+            - sensor.template.publish:
+                id: extraction_spindown_time_left
+                state: !lambda 'return id(main_motor_spindown_count_down);'
+            - delay: 1s
+
+  # Sets the state to cleaning and  engages the cleaner motor output.
+  - id: cleaner
+    mode: single
+    then:
+      - logger.log: Setting state to cleaning
+      - script.execute:
+          id: set_state
+          new_state: !lambda 'return cleaning_state->value();'
+      - switch.turn_on: out2
+
+  # Runs a cleaning cycle on the cleaning motor controlling associated state.
+  - id: cleaning_cycle
+    mode: single
+    then:
+      - script.execute: cleaner
+      - globals.set:
+          id: cleaning_count_down
+          value: !lambda 'return id(cleaning_cycle_runtime);'
+      - while:
+          condition:
+            lambda: |-
+              return id(cleaning_count_down) > 0;
+          then:
+            - lambda: id(cleaning_count_down) -= 1;
+            - sensor.template.publish:
+                id: cleaning_time_left
+                state: !lambda 'return id(cleaning_count_down);'
+            - delay: 1s
+      - switch.turn_off: out2
+      - script.execute: cleaner_spindown
+      - script.wait: cleaner_spindown
+
+  # Runs the steps needed to spin down the cleaning motor setting associated
+  # state.
+  - id: cleaner_spindown
+    mode: single
+    then:
+      - logger.log: Setting state to cleaning-spindown
+      - script.execute:
+          id: set_state
+          new_state: !lambda 'return cleaning_spindown_state->value();'
+      - switch.turn_off: out2
+      - globals.set:
+          id: cleaning_motor_spindown_count_down
+          value: !lambda 'return id(cleaning_motor_spindown_time);'
+      - while:
+          condition:
+            lambda: |-
+              return id(cleaning_motor_spindown_count_down) > 0;
+          then:
+            - lambda: id(cleaning_motor_spindown_count_down) -= 1;
+            - sensor.template.publish:
+                id: cleaning_motor_spin_down_time_left
+                state: !lambda 'return id(cleaning_motor_spindown_count_down);'
+            - delay: 1s
+
+  - id: set_state
+    mode: single
+    parameters:
+      new_state: 'std::string'
+    then:
+      - if:
+          condition:
+            - and:
+              - text_sensor.state:
+                  id: state
+                  state: !lambda 'return bin_full_state->value();'
+              - binary_sensor.is_on: bin_full
+          then:
+            - globals.set:
+                id: want_to_state
+                value: !lambda 'return new_state;'
+          else:
+            - globals.set:
+                id: want_to_state
+                value: !lambda 'return id(state).state;'
+            - text_sensor.template.publish:
+                id: state
+                state: !lambda 'return new_state;'
+      - if:
+          condition:
+            lambda: 'return id(want_to_state).empty();'
+          then:
+              - globals.set:
+                  id: want_to_state
+                  value: !lambda 'return id(state).state;'
+
+sn74hc595:
+  - id: 'sn74hc595_hub'
+    data_pin: GPIO13
+    clock_pin: GPIO14
+    latch_pin: GPIO4
+    sr_count: 1
+
+sensor:
+  # Sensor for indicating the minimum run time left in extraction mode. Useful
+  # inside of HA for dashboards and user feedback.
+  - platform: template
+    name: Extraction Minimum Time Left
+    id: extraction_min_runtime_left
+    icon: mdi:timer-minus-outline
+    unit_of_measurement: s
+    device_class: duration
+    state_class: measurement
+    lambda: |-
+      return id(main_motor_count_down);
+
+  # Sensor for indicating the spin down time left for the extraction motor.
+  - platform: template
+    name: Extraction Spin Down Time Left
+    id: extraction_spindown_time_left
+    icon: mdi:timer-minus-outline
+    unit_of_measurement: s
+    device_class: duration
+    state_class: measurement
+    lambda: |-
+      return id(main_motor_spindown_count_down);
+
+  # Sensor for indicating the cleaning time left in a cleaning cycle.
+  - platform: template
+    name: Cleaning Time Left
+    id: cleaning_time_left
+    icon: mdi:timer-minus-outline
+    unit_of_measurement: s
+    device_class: duration
+    state_class: measurement
+    lambda: |-
+      return id(cleaning_count_down);
+
+  # Sensor for indicating the spin down time remaining for the cleaning motor.
+  - platform: template
+    name: Cleaner Spin Down Time Left
+    id: cleaning_motor_spin_down_time_left
+    icon: mdi:timer-minus-outline
+    unit_of_measurement: s
+    device_class: duration
+    state_class: measurement
+    lambda: |-
+      return id(cleaning_motor_spindown_count_down);
+
+button:
+  # Reset fn to call from a reset button press.
+  - platform: restart
+    id: restart_1
+
+binary_sensor:
+  - platform: homeassistant
+    id: bin_full
+    entity_id: binary_sensor.dust_extractor_bin_full
+    publish_initial_state: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return x;'
+            then:
+              - script.execute:
+                  id: set_state
+                  new_state: !lambda 'return bin_full_state->value();'
+              - script.wait: set_state
+              - switch.turn_off: extraction_virtual
+            else:
+              - script.execute:
+                  id: set_state
+                  new_state: !lambda 'return id(want_to_state);'
+              - script.wait: set_state
+
+  # Reset button located on the front of the shelly.
+  - platform: gpio
+    id: reset_button
+    pin:
+      number: 35
+      inverted: true
+    on_click:
+      min_length: 400ms
+      max_length: 800ms
+      then:
+        - button.press: restart_1
+    on_double_click:
+      then:
+        - switch.toggle: extraction_virtual
+
+text_sensor:
+  - platform: template
+    name: ${friendly_name} State
+    id: state
+    icon: mdi:state-machine
+
+switch:
+  # Main switch for toggling extraction.
+  - platform: template
+    id: extraction_virtual
+    name: ${friendly_name} ${extraction_name}
+    icon: mdi:vacuum
+    restore_mode: ALWAYS_OFF
+    lambda: |-
+      return id(extraction_virtual_state);
+    turn_on_action:
+      # esphome doesn't have a break for if statements so if cleaning is in
+      # progress then we don't go any further till it's finished.
+      - if:
+          condition:
+            lambda: 'return !id(is_cleaning) && !id(bin_full).state;'
+          then:
+            # We need to lock out any other actions by the cleaner straight away.
+            - globals.set:
+                id: is_extracting
+                value: "true"
+            # We set the state of the extraction mode to on straight away to signal
+            # intent. While we may not start extracting straight away we still need
+            # to be clear with intent and offer fast feedback to the user.
+            - globals.set:
+                id: extraction_virtual_state
+                value: "true"
+            - logger.log: Extraction initiated
+
+            - logger.log: Setting state to extraction
+            - script.execute:
+                id: set_state
+                new_state: !lambda 'return extracting_state->value();'
+            - switch.turn_on: out1 # Send it Mate!!
+
+            # We need to start the script that monitors the minimum run time of the
+            # motor.
+            - logger.log: Setting minimum main motor run time count down
+            - script.execute: main_motor_min_runtime_runner
+
+    turn_off_action:
+      # We set the state of the extraction mode to on straight away to signal
+      # intent. While we may not start extracting straight away we still need
+      # to be clear with intent and offer fast feedback to the user.
+      - if:
+          condition:
+            lambda: 'return id(extraction_virtual_state);'
+          then:
+            - logger.log: Extraction turning off
+
+            - logger.log: Waiting for minimum main motor run time to be reached
+            - if:
+                condition:
+                  - script.is_running: main_motor_min_runtime_runner
+                then:
+                  - script.execute:
+                      id: set_state
+                      new_state: !lambda 'return extracting_min_run_state->value();'
+
+            - script.wait: main_motor_min_runtime_runner
+            - logger.log: Minimum motor run time has been reached turning off
+
+            - script.execute: main_motor_spindown
+            - script.wait: main_motor_spindown
+
+            - logger.log: Setting state to standby
+            - script.execute:
+                id: set_state
+                new_state: !lambda 'return standby_state->value();'
+            - globals.set:
+                id: is_extracting
+                value: "false"
+
+            - globals.set:
+                id: extraction_virtual_state
+                value: "false"
+
+            - logger.log: Turning on cleaning cycle after extraction use
+            - switch.turn_on: clean_virtual
+
+  # Main switch for starting a cleaning cycle.
+  - platform: template
+    id: clean_virtual
+    name: ${friendly_name} ${clean_name}
+    icon: mdi:spray-bottle
+    restore_mode: ALWAYS_OFF
+    lambda: |-
+      return id(clean_virtual_state);
+    turn_on_action:
+      # esphome doesn't have a break for if statements so if cleaning is in
+      # progress then we don't go any further till it's finished.
+      - if:
+          condition:
+            lambda: 'return !id(is_extracting);'
+          then:
+            # We need to lock out any other actions by the cleaner straight away.
+            - globals.set:
+                id: is_cleaning
+                value: "true"
+            # We set the state of the clean mode to on straight away to signal
+            # intent. While we may not start cleaning straight away we still need
+            # to be clear with intent and offer fast feedback to the user.
+            - globals.set:
+                id: clean_virtual_state
+                value: "true"
+            - logger.log: Cleaning initiated
+
+            - script.execute: cleaning_cycle
+            - script.wait: cleaning_cycle
+            - switch.turn_off: clean_virtual
+
+    turn_off_action:
+      - globals.set:
+          id: clean_virtual_state
+          value: "false"
+      - if:
+          condition:
+            - script.is_running: cleaning_cycle
+          then:
+            - logger.log: Waiting for cleaning cycle to finish
+            - script.wait: cleaning_cycle
+          else:
+            - switch.turn_off: out2
+            - script.execute: cleaner_spindown
+            - script.wait: cleaner_spindown
+
+      - logger.log: Setting state to standby
+      - script.execute:
+          id: set_state
+          new_state: !lambda 'return standby_state->value();'
+      - globals.set:
+          id: is_cleaning
+          value: "false"
+
+  # The idea behind this switch is so that the cleaner can be turned off and on
+  # for a different amount of time then the normal cleaning cycle.
+  - platform: template
+    id: cleaner_virtual
+    name: ${friendly_name} ${cleaner_name}
+    icon: mdi:spray-bottle
+    restore_mode: ALWAYS_OFF
+    lambda: |-
+      return id(clean_virtual_state);
+    turn_on_action:
+      # esphome doesn't have a break for if statements so if cleaning is in
+      # progress then we don't go any further till it's finished.
+      - if:
+          condition:
+            lambda: 'return !id(is_extracting);'
+          then:
+            # We need to lock out any other actions by the cleaner straight away.
+            - globals.set:
+                id: is_cleaning
+                value: "true"
+            - globals.set:
+                id: clean_virtual_state
+                value: "true"
+            - logger.log: Cleaner initiated
+            - script.execute: cleaner
+    turn_off_action:
+      - switch.turn_off: clean_virtual
+
+  # Relay 1
+  - platform: gpio
+    id: out1
+    restore_mode: ALWAYS_OFF
+    pin:
+      sn74hc595: sn74hc595_hub
+      number: 0
+      inverted: false
+
+  # Relay 2
+  - platform: gpio
+    id: out2
+    restore_mode: ALWAYS_OFF
+    pin:
+      sn74hc595: sn74hc595_hub
+      number: 1
+      inverted: false
+
+  - platform: gpio
+    id: rgb_b
+    restore_mode: ALWAYS_OFF
+    pin:
+      sn74hc595: sn74hc595_hub
+      number: 2
+      inverted: false
+
+  - platform: gpio
+    id: rgb_g
+    restore_mode: ALWAYS_OFF
+    pin:
+      sn74hc595: sn74hc595_hub
+      number: 3
+      inverted: false
+
+  - platform: gpio
+    id: rgb_r
+    restore_mode: ALWAYS_OFF
+    pin:
+      sn74hc595: sn74hc595_hub
+      number: 4
+      inverted: false

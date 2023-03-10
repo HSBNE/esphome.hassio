@@ -1,0 +1,49 @@
+---
+substitutions:
+  device_name: ws-dust-extractor-buttons-con
+  friendly_name: Dust Extractor Buttons Container
+  project_name: hsbne.woodshop
+  cleaner_on_gpio: "32"
+  extraction_on_gpio: "33"
+  extraction_off_gpio: "13"
+  upload_speed: "115200"
+
+packages:
+  common: !include ./modules/common-esp32.yaml
+  extractor_state_light_control: !include ./modules/ws-dust-extractor/extractor-state-light-control.yaml
+  extractor_buttons: !include ./modules/ws-dust-extractor/extractor-buttons.yaml
+  extractor_cleaner_buttons: !include ./modules/ws-dust-extractor/extractor-cleaner-buttons.yaml
+
+status_led:
+  pin: GPIO23
+
+binary_sensor:
+  # Bin full IR sensor
+  - platform: gpio
+    pin: GPIO17
+    id: bin_full
+    name: Dust Extractor Bin Full
+    filters:
+      - delayed_on: 10s
+      - delayed_off: 2s
+
+output:
+  - id: cleaning_output
+    platform: gpio
+    inverted: true
+    pin: GPIO5
+
+  - id: bin_full_output
+    platform: gpio
+    inverted: true
+    pin: GPIO18
+
+  - id: extraction_output
+    platform: gpio
+    inverted: true
+    pin: GPIO19
+
+  - id: standby_output
+    platform: gpio
+    inverted: true
+    pin: GPIO22

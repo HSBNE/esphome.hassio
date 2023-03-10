@@ -1,0 +1,9 @@
+---
+substitutions:
+  device_name: ws-dust-extractor
+  friendly_name: Dust Extractor
+  project_name: hsbne.woodshop
+
+packages:
+  common: !include ./modules/devices/dust-extractor-shelly-pro-2pm.yaml
+

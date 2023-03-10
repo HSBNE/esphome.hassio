@@ -1,0 +1,37 @@
+---
+substitutions:
+  device_name: ws-dust-extractor-btns-shop
+  friendly_name: Dust Extractor Button Box Shop 1
+  project_name: hsbne.woodshop
+  extraction_on_gpio: "14"
+  extraction_off_gpio: "12"
+  upload_speed: "115200"
+
+packages:
+  common: !include ./modules/common-esp32.yaml
+  extractor_state_light_control: !include ./modules/ws-dust-extractor/extractor-state-light-control.yaml
+  extractor_buttons: !include ./modules/ws-dust-extractor/extractor-buttons.yaml
+
+status_led:
+  pin: GPIO23
+
+output:
+  - id: cleaning_output
+    platform: gpio
+    inverted: false
+    pin: GPIO25
+
+  - id: bin_full_output
+    platform: gpio
+    inverted: false
+    pin: GPIO26
+
+  - id: extraction_output
+    platform: gpio
+    inverted: false
+    pin: GPIO33
+
+  - id: standby_output
+    platform: gpio
+    inverted: false
+    pin: GPIO32
