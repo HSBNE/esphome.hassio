@@ -1,2 +1,8 @@
 ---
+substitutions:
+  logger_level: DEBUG
+  logger_baud_rate: "115200"
+
 logger:
+  level: ${logger_level}
+  baud_rate: ${logger_baud_rate}

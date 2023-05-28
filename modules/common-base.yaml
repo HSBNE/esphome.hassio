@@ -12,6 +12,7 @@ esphome:
 
 packages:
   esphome: !include common/esphome.yaml
+  debug: !include common/debug.yaml
   wifi: !include common/wifi.yaml
   ota: !include common/ota.yaml
   sensors: !include common/sensors.yaml
